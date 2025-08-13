@@ -1,3 +1,96 @@
+/* Diff legend for remote-only files */
+.sync-diff-legend {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-family: var(--font-monospace, monospace);
+  opacity: 0.85;
+}
+.sync-diff-legend-added {
+  color: var(--color-green);
+}
+.sync-diff-legend-deleted {
+  color: var(--color-red);
+}
+/* Remote-only lines: show both green (for pull) and red (for push) backgrounds for clarity */
+.sync-diff-line-remoteonly {
+  background: linear-gradient(90deg, rgba(0,255,0,0.08) 0%, rgba(255,0,0,0.08) 100%);
+  border-left: 3px solid var(--color-blue);
+}
+/* Repository Card Styles */
+.sync-repo-card {
+  background: var(--background-secondary-alt, #f5f6fa);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  padding: 18px 22px 14px 22px;
+  margin-bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--background-modifier-border, #e1e4e8);
+}
+.sync-repo-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.sync-repo-card-icon {
+  font-size: 1.3em;
+  margin-right: 2px;
+}
+.sync-repo-card-title {
+  color: var(--text-accent, #3b3b3b);
+}
+.sync-repo-card-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05em;
+  padding-left: 2px;
+}
+.sync-repo-card-name {
+  font-family: var(--font-monospace, monospace);
+  background: var(--background-modifier-form-field, #e9ecef);
+  border-radius: 5px;
+  padding: 2px 8px;
+  color: var(--text-normal, #222);
+  font-size: 1em;
+}
+
+/* Repository selector styling */
+.sync-repository-container {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sync-repository-label {
+  font-weight: 600;
+  color: var(--text-normal);
+  font-size: 14px;
+}
+
+.sync-repository-selector {
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.sync-repository-selector:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
 /*
 
 This CSS file will be included with your plugin, and
@@ -6,3 +99,530 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+.github-auth-status {
+	margin-top: 10px;
+	padding: 8px 12px;
+	border-radius: 4px;
+	font-weight: 500;
+	min-height: 20px;
+}
+
+.github-auth-status.auth-success {
+	background-color: var(--background-modifier-success);
+	color: var(--text-success);
+	border: 1px solid var(--background-modifier-success);
+}
+
+.github-auth-status.auth-error {
+	background-color: var(--background-modifier-error);
+	color: var(--text-error);
+	border: 1px solid var(--background-modifier-error);
+}
+
+.github-user-info {
+	border-left: 3px solid var(--interactive-accent);
+	background-color: var(--background-secondary);
+	padding-left: 10px;
+}
+
+.github-user-info .setting-item-description {
+	color: var(--text-accent);
+	font-weight: 600;
+}
+
+/* Full width dropdown styling */
+.full-width-dropdown .setting-item-control {
+	width: 100%;
+}
+
+.full-width-dropdown .dropdown {
+	width: 100%;
+	min-width: 100%;
+}
+
+/* Sync View Styling */
+.sync-repo-section {
+	margin-bottom: 20px;
+}
+
+.sync-repo-name {
+	font-family: var(--font-monospace);
+	background-color: var(--background-secondary);
+	padding: 8px 12px;
+	border-radius: 4px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.sync-button-container {
+	margin-bottom: 20px;
+	display: flex;
+	gap: 10px;
+	justify-content: center;
+}
+
+.sync-button {
+	padding: 10px 20px;
+	font-size: 14px;
+	font-weight: 500;
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+	background-color: var(--interactive-normal);
+	color: var(--text-normal);
+	cursor: pointer;
+	min-width: 80px;
+	transition: all 0.2s ease;
+	flex: 1;
+	max-width: 120px;
+}
+
+.sync-button:hover:not(:disabled) {
+	background-color: var(--interactive-hover);
+	transform: translateY(-1px);
+}
+
+.sync-button-primary {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: var(--interactive-accent);
+}
+
+.sync-button-primary:hover:not(:disabled) {
+	background-color: var(--interactive-accent-hover);
+}
+
+.sync-button-secondary {
+	background-color: var(--background-secondary);
+	border-color: var(--background-modifier-border);
+}
+
+.sync-button-secondary:hover:not(:disabled) {
+	background-color: var(--background-modifier-hover);
+}
+
+.sync-button:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.sync-button.mod-cta {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.sync-button.mod-cta:hover:not(:disabled) {
+	background-color: var(--interactive-accent-hover);
+}
+
+.sync-diff-container {
+	margin-top: 20px;
+}
+
+.sync-diffs-header {
+	color: var(--text-accent);
+	margin-bottom: 16px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sync-diff-item {
+	margin-bottom: 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.sync-diff-file-header {
+	padding: 12px 16px;
+	background-color: var(--background-secondary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	cursor: pointer;
+	user-select: none;
+}
+
+.sync-diff-file-header:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.sync-diff-expandable {
+	cursor: pointer;
+}
+
+.sync-diff-expand-icon {
+	font-size: 12px;
+	color: var(--text-muted);
+	transition: transform 0.2s ease;
+	min-width: 12px;
+}
+
+.sync-diff-filename {
+	font-family: var(--font-monospace);
+	font-weight: 500;
+	flex: 1;
+}
+
+.sync-diff-status {
+	padding: 4px 8px;
+	border-radius: 12px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.sync-diff-status-added {
+	background-color: var(--color-green);
+	color: white;
+}
+
+.sync-diff-status-modified {
+	background-color: var(--color-yellow);
+	color: var(--color-base-00);
+}
+
+.sync-diff-status-deleted {
+	background-color: var(--color-red);
+	color: white;
+}
+
+.sync-diff-status-remote-added {
+	background-color: var(--color-blue);
+	color: white;
+}
+
+.sync-diff-status-remote-modified {
+	background-color: var(--color-purple);
+	color: white;
+}
+
+.sync-diff-status-case-conflict-only {
+	background-color: var(--color-yellow);
+	color: var(--color-base-00);
+}
+
+.sync-diff-stats {
+	display: flex;
+	gap: 8px;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.sync-diff-additions {
+	color: var(--color-green);
+}
+
+.sync-diff-deletions {
+	color: var(--color-red);
+}
+
+.sync-diff-content {
+	transition: all 0.3s ease;
+}
+
+.sync-diff-hidden {
+	display: none;
+}
+
+.sync-diff-visible {
+	display: block;
+}
+
+.sync-diff-view {
+	max-height: 400px;
+	overflow-y: auto;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.sync-diff-line {
+	display: flex;
+	align-items: flex-start;
+	padding: 2px 0;
+	white-space: pre;
+}
+
+.sync-diff-line-added {
+	background-color: rgba(0, 255, 0, 0.1);
+	border-left: 3px solid var(--color-green);
+}
+
+.sync-diff-line-deleted {
+	background-color: rgba(255, 0, 0, 0.1);
+	border-left: 3px solid var(--color-red);
+}
+
+.sync-diff-line-context {
+	background-color: var(--background-primary);
+	border-left: 3px solid transparent;
+}
+
+.sync-diff-line-number {
+	width: 50px;
+	text-align: right;
+	color: var(--text-muted);
+	padding-right: 8px;
+	flex-shrink: 0;
+}
+
+.sync-diff-line-prefix {
+	width: 20px;
+	color: var(--text-muted);
+	text-align: center;
+	flex-shrink: 0;
+}
+
+.sync-diff-line-content {
+	flex: 1;
+	padding-left: 8px;
+	word-break: break-all;
+}
+
+.sync-no-changes {
+	text-align: center;
+	color: var(--text-muted);
+	padding: 20px;
+	font-style: italic;
+}
+
+.sync-error {
+	color: var(--text-error);
+	background-color: var(--background-modifier-error);
+	padding: 12px;
+	border-radius: 4px;
+	border: 1px solid var(--color-red);
+}
+
+.sync-no-repo-section {
+	text-align: center;
+	padding: 40px 20px;
+}
+
+.sync-no-repo-message {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.full-width-dropdown select {
+	width: 100%;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+	padding: 12px 16px;
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	color: var(--text-normal);
+	min-height: 40px;
+}
+
+.full-width-dropdown select:focus {
+	border-color: var(--interactive-accent);
+	outline: none;
+	box-shadow: 0 0 0 2px var(--interactive-accent-hover);
+}
+
+/* Sync view styling */
+.sync-repo-section {
+	padding: 15px;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	margin: 10px 0;
+	border-left: 3px solid var(--interactive-accent);
+}
+
+.sync-repo-section h3 {
+	margin: 0 0 8px 0;
+	color: var(--text-accent);
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.sync-repo-name {
+	font-family: var(--font-monospace);
+	font-size: 13px;
+	color: var(--text-normal);
+	background-color: var(--background-primary-alt);
+	padding: 6px 10px;
+	border-radius: 4px;
+	margin: 0;
+}
+
+.sync-no-repo-section {
+	padding: 20px;
+	text-align: center;
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.sync-no-repo-message {
+	margin: 0;
+	line-height: 1.5;
+}
+
+/* Sync button and diff styling */
+.sync-button-container {
+	margin: 15px 0;
+	text-align: center;
+}
+
+.sync-button {
+	padding: 10px 20px;
+	font-size: 14px;
+	font-weight: 600;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	min-width: 100px;
+}
+
+.sync-button:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.sync-diff-container {
+	margin-top: 20px;
+}
+
+.sync-diffs-header {
+	margin: 0 0 15px 0;
+	color: var(--text-accent);
+	font-size: 16px;
+	font-weight: 600;
+	padding-bottom: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sync-diff-item {
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 12px;
+	margin-bottom: 10px;
+}
+
+.sync-diff-file-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.sync-diff-filename {
+	font-family: var(--font-monospace);
+	font-size: 13px;
+	color: var(--text-normal);
+	font-weight: 600;
+}
+
+.sync-diff-status {
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.sync-diff-status-modified {
+	background-color: var(--color-yellow);
+	color: var(--color-base-00);
+}
+
+.sync-diff-status-added {
+	background-color: var(--color-green);
+	color: var(--color-base-00);
+}
+
+.sync-diff-status-deleted {
+	background-color: var(--color-red);
+	color: var(--color-base-00);
+}
+
+.sync-diff-stats {
+	display: flex;
+	gap: 10px;
+	font-family: var(--font-monospace);
+	font-size: 12px;
+}
+
+.sync-diff-additions {
+	color: var(--color-green);
+	font-weight: 600;
+}
+
+.sync-diff-deletions {
+	color: var(--color-red);
+	font-weight: 600;
+}
+
+.sync-no-changes {
+	text-align: center;
+	padding: 20px;
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.sync-error {
+	background-color: var(--background-modifier-error);
+	color: var(--text-error);
+	padding: 12px;
+	border-radius: 6px;
+	font-weight: 500;
+}
+
+.github-repositories-container {
+	margin-top: 15px;
+	padding: 15px;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.github-repositories-container h4 {
+	margin: 0 0 10px 0;
+	color: var(--text-accent);
+	font-size: 14px;
+}
+
+.github-repositories-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	max-height: 200px;
+	overflow-y: auto;
+}
+
+.github-repositories-list li {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--background-modifier-border-hover);
+	border-radius: 4px;
+	margin-bottom: 2px;
+	transition: background-color 0.2s ease;
+}
+
+.github-repositories-list li:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.github-repositories-list li:last-child {
+	border-bottom: none;
+}
+
+.github-repositories-list code {
+	font-size: 12px;
+	color: var(--text-muted);
+	background-color: var(--background-primary-alt);
+	padding: 4px 8px;
+	border-radius: 3px;
+	display: block;
+	transition: all 0.2s ease;
+}
+
+.github-repositories-list code.selected-repo {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-weight: 600;
+}
