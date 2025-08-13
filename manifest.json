@@ -3,7 +3,7 @@
 	"name": "Kolaba",
 	"version": "1.0.1",
 	"minAppVersion": "0.15.0",
-	"description": "Obsidian plugin to sync notes between devices using Github repository.",
+	"description": "Keep your notes synchronized across devices with GitHub repositories.",
 	"author": "Denys Skvortsov",
 	"authorUrl": "https://skvortsovden.github.io",
 	"isDesktopOnly": false
