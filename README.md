@@ -1,4 +1,4 @@
-# Sync my notes
+# Kolaba
 
 Obsidian plugin to sync notes between devices using Github repository.
 

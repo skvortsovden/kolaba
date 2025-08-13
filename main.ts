@@ -1,39 +1,45 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, ItemView, WorkspaceLeaf, TFile, TFolder } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting, ItemView, WorkspaceLeaf, TFile, TFolder } from 'obsidian';
 
 const VIEW_TYPE_SYNC = 'sync-view';
+const GITHUB_API_BASE = 'https://api.github.com';
+const USER_AGENT = 'Obsidian-Sync-Plugin';
+const EMPTY_TOKEN_ERROR = 'Please provide a GitHub token';
 
-interface SyncMyNotePluginSettings {
-	mySetting: string;
-	authStatus: string;
+interface KolabaPluginSettings {
+	githubToken: string;
 	username: string;
 	repositories: string[];
 	selectedRepository: string;
 	deviceName: string;
 }
 
-const DEFAULT_SETTINGS: SyncMyNotePluginSettings = {
-	mySetting: 'default',
-	authStatus: '',
+const DEFAULT_SETTINGS: KolabaPluginSettings = {
+	githubToken: '',
 	username: '',
 	repositories: [],
 	selectedRepository: '',
 	deviceName: ''
 }
 
-export default class SyncMyNotePlugin extends Plugin {
-	settings: SyncMyNotePluginSettings;
+export default class KolabaPlugin extends Plugin {
+	settings: KolabaPluginSettings;
+
+	private createGitHubHeaders(token: string) {
+		return {
+			'Authorization': `token ${token}`,
+			'User-Agent': USER_AGENT,
+			'Accept': 'application/vnd.github.v3+json'
+		};
+	}
 
 	async checkGitHubAuth(token: string): Promise<{status: string, username: string}> {
-		if (!token || token.trim() === '' || token === 'default') {
-			return {status: 'Please provide a GitHub token', username: ''};
+		if (!token?.trim()) {
+			return {status: EMPTY_TOKEN_ERROR, username: ''};
 		}
 
 		try {
-			const response = await fetch('https://api.github.com/user', {
-				headers: {
-					'Authorization': `token ${token}`,
-					'User-Agent': 'Obsidian-Sync-Plugin'
-				}
+			const response = await fetch(`${GITHUB_API_BASE}/user`, {
+				headers: this.createGitHubHeaders(token)
 			});
 
 			if (response.ok) {
@@ -53,16 +59,13 @@ export default class SyncMyNotePlugin extends Plugin {
 	}
 
 	async fetchGitHubRepositories(token: string): Promise<{success: boolean, repositories: string[], error?: string}> {
-		if (!token || token.trim() === '' || token === 'default') {
-			return {success: false, repositories: [], error: 'Please provide a GitHub token'};
+		if (!token?.trim()) {
+			return {success: false, repositories: [], error: EMPTY_TOKEN_ERROR};
 		}
 
 		try {
-			const response = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
-				headers: {
-					'Authorization': `token ${token}`,
-					'User-Agent': 'Obsidian-Sync-Plugin'
-				}
+			const response = await fetch(`${GITHUB_API_BASE}/user/repos?per_page=100&sort=updated`, {
+				headers: this.createGitHubHeaders(token)
 			});
 
 			if (response.ok) {
@@ -80,18 +83,14 @@ export default class SyncMyNotePlugin extends Plugin {
 	}
 
 	async fetchGitHubContents(token: string, repoPath: string, path: string = ''): Promise<{success: boolean, contents: any[], error?: string}> {
-		if (!token || token.trim() === '' || token === 'default') {
-			return {success: false, contents: [], error: 'Please provide a GitHub token'};
+		if (!token?.trim()) {
+			return {success: false, contents: [], error: EMPTY_TOKEN_ERROR};
 		}
 
 		try {
-			const url = `https://api.github.com/repos/${repoPath}/contents/${path}`;
+			const url = `${GITHUB_API_BASE}/repos/${repoPath}/contents/${path}`;
 			const response = await fetch(url, {
-				headers: {
-					'Authorization': `token ${token}`,
-					'User-Agent': 'Obsidian-Sync-Plugin',
-					'Accept': 'application/vnd.github.v3+json'
-				}
+				headers: this.createGitHubHeaders(token)
 			});
 
 			if (response.ok) {
@@ -112,21 +111,17 @@ export default class SyncMyNotePlugin extends Plugin {
 	}
 
 	async fetchFileContent(token: string, repoPath: string, filePath: string): Promise<{success: boolean, content: string, sha: string, error?: string}> {
-		if (!token || token.trim() === '' || token === 'default') {
-			return {success: false, content: '', sha: '', error: 'Please provide a GitHub token'};
+		if (!token?.trim()) {
+			return {success: false, content: '', sha: '', error: EMPTY_TOKEN_ERROR};
 		}
 
 		try {
 			// Properly encode the file path to handle special characters
 			const encodedFilePath = encodeURIComponent(filePath).replace(/%2F/g, '/');
-			const url = `https://api.github.com/repos/${repoPath}/contents/${encodedFilePath}`;
+			const url = `${GITHUB_API_BASE}/repos/${repoPath}/contents/${encodedFilePath}`;
 			
 			const response = await fetch(url, {
-				headers: {
-					'Authorization': `token ${token}`,
-					'User-Agent': 'Obsidian-Sync-Plugin',
-					'Accept': 'application/vnd.github.v3+json'
-				}
+				headers: this.createGitHubHeaders(token)
 			});
 
 			if (response.ok) {
@@ -173,25 +168,17 @@ export default class SyncMyNotePlugin extends Plugin {
 		
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('folder-sync', 'Sync my notes', (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('folder-sync', 'Kolaba', (evt: MouseEvent) => {
 			// Open the sync sidebar when clicked
 			this.activateSyncView();
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new KolabaSettingTab(this.app, this));
 
 		// Register the sync view
 		this.registerView(VIEW_TYPE_SYNC, (leaf) => new SyncView(leaf, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
 	async activateSyncView() {
@@ -230,26 +217,10 @@ export default class SyncMyNotePlugin extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+class KolabaSettingTab extends PluginSettingTab {
+	plugin: KolabaPlugin;
 
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: SyncMyNotePlugin;
-
-	constructor(app: App, plugin: SyncMyNotePlugin) {
+	constructor(app: App, plugin: KolabaPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -264,12 +235,11 @@ class SampleSettingTab extends PluginSettingTab {
 			.setDesc('Enter your GitHub personal access token')
 			.addText(text => text
 				.setPlaceholder('Enter your token here')
-				.setValue(this.plugin.settings.mySetting)
+				.setValue(this.plugin.settings.githubToken)
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.githubToken = value;
 					await this.plugin.saveSettings();
-					// Clear status, username, repositories and selected repository when token changes
-					this.plugin.settings.authStatus = '';
+					// Clear username, repositories and selected repository when token changes
 					this.plugin.settings.username = '';
 					this.plugin.settings.repositories = [];
 					this.plugin.settings.selectedRepository = '';
@@ -297,8 +267,7 @@ class SampleSettingTab extends PluginSettingTab {
 					button.setButtonText('Testing...');
 					button.setDisabled(true);
 					
-					const result = await this.plugin.checkGitHubAuth(this.plugin.settings.mySetting);
-					this.plugin.settings.authStatus = result.status;
+					const result = await this.plugin.checkGitHubAuth(this.plugin.settings.githubToken);
 					this.plugin.settings.username = result.username;
 					await this.plugin.saveSettings();
 					
@@ -324,7 +293,7 @@ class SampleSettingTab extends PluginSettingTab {
 						button.setButtonText('Loading...');
 						button.setDisabled(true);
 						
-						const result = await this.plugin.fetchGitHubRepositories(this.plugin.settings.mySetting);
+						const result = await this.plugin.fetchGitHubRepositories(this.plugin.settings.githubToken);
 						if (result.success) {
 							this.plugin.settings.repositories = result.repositories;
 							// Clear selected repository when repositories are refreshed
@@ -379,14 +348,14 @@ class SampleSettingTab extends PluginSettingTab {
 }
 
 class SyncView extends ItemView {
-	plugin: SyncMyNotePlugin;
+	plugin: KolabaPlugin;
 	private syncButton: HTMLButtonElement | null = null;
 	private pullButton: HTMLButtonElement | null = null;
 	private pushButton: HTMLButtonElement | null = null;
 	private diffContainer: HTMLElement | null = null;
 	private currentDiffs: any[] = [];
 
-	constructor(leaf: WorkspaceLeaf, plugin: SyncMyNotePlugin) {
+	constructor(leaf: WorkspaceLeaf, plugin: KolabaPlugin) {
 		super(leaf);
 		this.plugin = plugin;
 	}
@@ -396,7 +365,7 @@ class SyncView extends ItemView {
 	}
 
 	getDisplayText() {
-		return 'Sync my notes';
+		return 'Kolaba';
 	}
 
 	getIcon() {
@@ -406,7 +375,7 @@ class SyncView extends ItemView {
 	async onOpen() {
 		const container = this.containerEl.children[1];
 		container.empty();
-		container.createEl('h2', { text: 'Sync my notes' });
+		container.createEl('h2', { text: 'Kolaba' });
 
 		// Show selected repository if available
 		if (this.plugin.settings.selectedRepository) {
@@ -678,7 +647,7 @@ class SyncView extends ItemView {
 	}
 
 	async performPush(diffs: any[]) {
-		const token = this.plugin.settings.mySetting;
+		const token = this.plugin.settings.githubToken;
 		const repoPath = this.plugin.settings.selectedRepository;
 		const processedFiles: string[] = [];
 
@@ -1266,7 +1235,7 @@ class SyncView extends ItemView {
 
 		const diffs: any[] = [];
 		const vault = this.plugin.app.vault;
-		const token = this.plugin.settings.mySetting;
+		const token = this.plugin.settings.githubToken;
 		const repoPath = this.plugin.settings.selectedRepository;
 
 		try {

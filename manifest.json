@@ -1,6 +1,6 @@
 {
 	"id": "sync-my-notes",
-	"name": "Sync my notes",
+	"name": "Kolaba",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Demonstrates some of the capabilities of the Obsidian API.",

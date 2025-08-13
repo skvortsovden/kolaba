@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "kolaba",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Obsidian plugin to sync notes between devices using Github repository",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
