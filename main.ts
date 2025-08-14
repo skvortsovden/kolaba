@@ -1,9 +1,54 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, ItemView, WorkspaceLeaf, TFile, TFolder } from 'obsidian';
+import { App, Notice, Plugin, PluginSettingTab, Setting, ItemView, WorkspaceLeaf, TFile, TFolder, requestUrl, Vault } from 'obsidian';
 
 const VIEW_TYPE_SYNC = 'sync-view';
 const GITHUB_API_BASE = 'https://api.github.com';
 const USER_AGENT = 'Obsidian-Sync-Plugin';
 const EMPTY_TOKEN_ERROR = 'Please provide a GitHub token';
+
+
+
+interface VaultAdapter {
+	basePath?: string;
+	path?: string;
+	fs?: {
+		getBasePath?: () => string;
+	};
+	read: (path: string) => Promise<string>;
+	write: (path: string, content: string) => Promise<void>;
+}
+
+interface GitHubContent {
+	name: string;
+	path: string;
+	sha: string;
+	size: number;
+	type: string;
+	download_url?: string;
+	content?: string;
+	encoding?: string;
+}
+
+interface FileDiff {
+	filename: string;
+	status: 'added' | 'modified' | 'remote-modified' | 'remote-only' | 'remote-added' | 'case-conflict-only' | 'deleted';
+	additions: number;
+	deletions: number;
+	localContent: string;
+	remoteContent: string;
+	sha: string;
+	remoteSha?: string;
+	matchType?: string;
+	localPath?: string;
+}
+
+interface GitHubTreeItem {
+	path: string;
+	sha: string;
+	type: string;
+	mode?: string;
+	size?: number;
+	url?: string;
+}
 
 interface KolabaPluginSettings {
 	githubToken: string;
@@ -38,12 +83,13 @@ export default class KolabaPlugin extends Plugin {
 		}
 
 		try {
-			const response = await fetch(`${GITHUB_API_BASE}/user`, {
+			const response = await requestUrl({
+				url: `${GITHUB_API_BASE}/user`,
 				headers: this.createGitHubHeaders(token)
 			});
 
-			if (response.ok) {
-				const userData = await response.json();
+			if (response.status === 200) {
+				const userData = response.json;
 				return {
 					status: `✅ Successfully authenticated as ${userData.login}`,
 					username: userData.login
@@ -51,7 +97,7 @@ export default class KolabaPlugin extends Plugin {
 			} else if (response.status === 401) {
 				return {status: '❌ Invalid token - authentication failed', username: ''};
 			} else {
-				return {status: `❌ GitHub API error: ${response.status} ${response.statusText}`, username: ''};
+				return {status: `❌ GitHub API error: ${response.status}`, username: ''};
 			}
 		} catch (error) {
 			return {status: `❌ Network error: ${error.message}`, username: ''};
@@ -64,37 +110,39 @@ export default class KolabaPlugin extends Plugin {
 		}
 
 		try {
-			const response = await fetch(`${GITHUB_API_BASE}/user/repos?per_page=100&sort=updated`, {
+			const response = await requestUrl({
+				url: `${GITHUB_API_BASE}/user/repos?per_page=100&sort=updated`,
 				headers: this.createGitHubHeaders(token)
 			});
 
-			if (response.ok) {
-				const repos = await response.json();
-				const repoNames = repos.map((repo: any) => `${repo.owner.login}/${repo.name}`);
+			if (response.status === 200) {
+				const repos = response.json;
+				const repoNames = repos.map((repo: {owner: {login: string}, name: string}) => `${repo.owner.login}/${repo.name}`);
 				return {success: true, repositories: repoNames};
 			} else if (response.status === 401) {
 				return {success: false, repositories: [], error: 'Invalid token - authentication failed'};
 			} else {
-				return {success: false, repositories: [], error: `GitHub API error: ${response.status} ${response.statusText}`};
+				return {success: false, repositories: [], error: `GitHub API error: ${response.status}`};
 			}
 		} catch (error) {
 			return {success: false, repositories: [], error: `Network error: ${error.message}`};
 		}
 	}
 
-	async fetchGitHubContents(token: string, repoPath: string, path: string = ''): Promise<{success: boolean, contents: any[], error?: string}> {
+	async fetchGitHubContents(token: string, repoPath: string, path: string = ''): Promise<{success: boolean, contents: GitHubContent[], error?: string}> {
 		if (!token?.trim()) {
 			return {success: false, contents: [], error: EMPTY_TOKEN_ERROR};
 		}
 
 		try {
 			const url = `${GITHUB_API_BASE}/repos/${repoPath}/contents/${path}`;
-			const response = await fetch(url, {
+			const response = await requestUrl({
+				url: url,
 				headers: this.createGitHubHeaders(token)
 			});
 
-			if (response.ok) {
-				const contents = await response.json();
+			if (response.status === 200) {
+				const contents = response.json;
 				// Ensure we always return an array
 				return {success: true, contents: Array.isArray(contents) ? contents : [contents]};
 			} else if (response.status === 404) {
@@ -103,7 +151,7 @@ export default class KolabaPlugin extends Plugin {
 			} else if (response.status === 401) {
 				return {success: false, contents: [], error: 'Invalid token - authentication failed'};
 			} else {
-				return {success: false, contents: [], error: `GitHub API error: ${response.status} ${response.statusText}`};
+				return {success: false, contents: [], error: `GitHub API error: ${response.status}`};
 			}
 		} catch (error) {
 			return {success: false, contents: [], error: `Network error: ${error.message}`};
@@ -120,12 +168,13 @@ export default class KolabaPlugin extends Plugin {
 			const encodedFilePath = encodeURIComponent(filePath).replace(/%2F/g, '/');
 			const url = `${GITHUB_API_BASE}/repos/${repoPath}/contents/${encodedFilePath}`;
 			
-			const response = await fetch(url, {
+			const response = await requestUrl({
+				url: url,
 				headers: this.createGitHubHeaders(token)
 			});
 
-			if (response.ok) {
-				const fileData = await response.json();
+			if (response.status === 200) {
+				const fileData = response.json;
 				if (fileData.type === 'file') {
 					if (fileData.content) {
 						// Properly decode base64 content with UTF-8 encoding
@@ -156,7 +205,7 @@ export default class KolabaPlugin extends Plugin {
 			} else if (response.status === 401) {
 				return {success: false, content: '', sha: '', error: 'Invalid token - authentication failed'};
 			} else {
-				return {success: false, content: '', sha: '', error: `GitHub API error: ${response.status} ${response.statusText}`};
+				return {success: false, content: '', sha: '', error: `GitHub API error: ${response.status}`};
 			}
 		} catch (error) {
 			return {success: false, content: '', sha: '', error: `Network error: ${error.message}`};
@@ -353,7 +402,7 @@ class SyncView extends ItemView {
 	private pullButton: HTMLButtonElement | null = null;
 	private pushButton: HTMLButtonElement | null = null;
 	private diffContainer: HTMLElement | null = null;
-	private currentDiffs: any[] = [];
+	private currentDiffs: FileDiff[] = [];
 
 	constructor(leaf: WorkspaceLeaf, plugin: KolabaPlugin) {
 		super(leaf);
@@ -547,7 +596,6 @@ class SyncView extends ItemView {
 
 		} catch (error) {
 			// Handle error
-			console.error('Pull failed:', error);
 			new Notice(`Pull failed: ${error.message}`);
 			
 			// Reset buttons
@@ -613,7 +661,6 @@ class SyncView extends ItemView {
 
 		} catch (error) {
 			// Handle error
-			console.error('Push failed:', error);
 			new Notice(`Push failed: ${error.message}`);
 
 			// Reset buttons
@@ -623,35 +670,30 @@ class SyncView extends ItemView {
 		}
 	}
 
-	async performPull(diffs: any[]) {
+	async performPull(diffs: FileDiff[]) {
 		const vault = this.plugin.app.vault;
 		const processedFiles: string[] = [];
 
-		console.log(`Starting pull process for ${diffs.length} files...`);
 
 		// Handle remote changes (pull remote changes locally)
 		for (const diff of diffs) {
 			try {
 				await this.pullRemoteChange(vault, diff);
 				processedFiles.push(diff.filename);
-				console.log(`Pulled remote changes for: ${diff.filename}`);
 			} catch (error) {
-				console.error(`Failed to pull remote changes for ${diff.filename}:`, error);
 				throw new Error(`Failed to pull remote changes for ${diff.filename}: ${error.message}`);
 			}
 		}
 
 		// Commit local changes using Git
 		await this.commitLocalChanges(processedFiles);
-		console.log('Committed pulled changes to Git');
 	}
 
-	async performPush(diffs: any[]) {
+	async performPush(diffs: FileDiff[]) {
 		const token = this.plugin.settings.githubToken;
 		const repoPath = this.plugin.settings.selectedRepository;
 		const processedFiles: string[] = [];
 
-		console.log(`Starting push process for ${diffs.length} files...`);
 
 		// Get the latest remote tree SHA for the push operation
 		const currentBranchSha = await this.getCurrentBranchSha(token, repoPath);
@@ -674,9 +716,7 @@ class SyncView extends ItemView {
 					// Only mark for deletion if file exists in remote tree
 					if (remoteFilesSet.has(diff.filename)) {
 						deletions.push(diff.filename);
-						console.log(`Marked for deletion: ${diff.filename}`);
 					} else {
-						console.log(`Skip deletion for ${diff.filename} (not present in remote)`);
 					}
 				} else {
 					// Create blob for added/modified files
@@ -686,33 +726,27 @@ class SyncView extends ItemView {
 						sha: blobSha,
 						mode: '100644' // Regular file mode
 					});
-					console.log(`Created blob for: ${diff.filename}`);
 				}
 				processedFiles.push(diff.filename);
 			} catch (error) {
-				console.error(`Failed to create blob for ${diff.filename}:`, error);
 				throw new Error(`Failed to create blob for ${diff.filename}: ${error.message}`);
 			}
 		}
 
 		// Get the current tree and create new tree
 		const newTreeSha = await this.createTree(token, repoPath, currentBranchSha, fileBlobs, deletions);
-		console.log(`Created new tree: ${newTreeSha}`);
 
 		// Create commit
 		const commitSha = await this.createCommit(token, repoPath, newTreeSha, currentBranchSha, processedFiles);
-		console.log(`Created commit: ${commitSha}`);
 
 		// Update branch reference
 		await this.updateBranchRef(token, repoPath, commitSha);
-		console.log(`Updated branch reference to: ${commitSha}`);
 
 		// Stage and commit local changes using Git
 		await this.commitLocalChanges(processedFiles);
-		console.log('Committed local changes to Git');
 	}
 
-	async pullRemoteChange(vault: any, diff: any) {
+	async pullRemoteChange(vault: Vault, diff: FileDiff) {
 		// Write remote content to local file
 		const filePath = diff.filename;
 		
@@ -721,12 +755,10 @@ class SyncView extends ItemView {
 			const conflictingFile = this.findCaseInsensitiveFile(vault, filePath);
 			
 			if (conflictingFile) {
-				console.log(`Case conflict detected: remote '${filePath}' conflicts with local '${conflictingFile.path}'`);
 				
 				// Handle case conflict - create both files for manual resolution
 				if (conflictingFile.path.toLowerCase() === filePath.toLowerCase()) {
 					// Same file with different case - show user both versions
-					console.log(`Creating conflict files for manual resolution`);
 					
 					// Create the remote file with a conflict suffix
 					const conflictPath = this.generateConflictPath(filePath, 'remote');
@@ -734,8 +766,10 @@ class SyncView extends ItemView {
 					
 					// Also create a backup of the local file
 					const localBackupPath = this.generateConflictPath(conflictingFile.path, 'local');
-					const localContent = await vault.read(conflictingFile);
-					await vault.create(localBackupPath, localContent);
+					if (conflictingFile instanceof TFile) {
+						const localContent = await vault.read(conflictingFile);
+						await vault.create(localBackupPath, localContent);
+					}
 					
 					// Show notice to user
 					new Notice(`Case conflict found! Created conflict files:\n- ${conflictPath} (remote)\n- ${localBackupPath} (local backup)\nPlease merge manually and delete the conflict files.`, 10000);
@@ -743,7 +777,6 @@ class SyncView extends ItemView {
 				} else {
 					// Different files but similar names - create with conflict suffix
 					const conflictPath = this.generateConflictPath(filePath, 'remote');
-					console.log(`Creating conflicted file: ${conflictPath}`);
 					await vault.create(conflictPath, diff.remoteContent);
 					return;
 				}
@@ -759,13 +792,14 @@ class SyncView extends ItemView {
 			if (!existingFile) {
 				const conflictingFile = this.findCaseInsensitiveFile(vault, filePath);
 				if (conflictingFile) {
-					console.log(`Case-insensitive match found: updating '${conflictingFile.path}' with remote content from '${filePath}'`);
 					existingFile = conflictingFile;
 				}
 			}
 			
 			if (existingFile) {
-				await vault.modify(existingFile, diff.remoteContent);
+				if (existingFile instanceof TFile) {
+					await vault.modify(existingFile, diff.remoteContent);
+				}
 			} else {
 				// File doesn't exist locally, create it
 				await vault.create(filePath, diff.remoteContent);
@@ -773,8 +807,7 @@ class SyncView extends ItemView {
 		} else if (diff.status === 'modified') {
 			// Handle local modifications - overwrite with remote content
 			const existingFile = vault.getAbstractFileByPath(filePath);
-			if (existingFile) {
-				console.log(`Overwriting locally modified file '${filePath}' with remote content`);
+			if (existingFile && existingFile instanceof TFile) {
 				await vault.modify(existingFile, diff.remoteContent);
 			} else {
 				// File doesn't exist locally, create it with remote content
@@ -783,7 +816,6 @@ class SyncView extends ItemView {
 		} else if (diff.status === 'case-conflict-only') {
 			// Handle pure case conflicts - create both files for manual resolution
 			if (diff.localPath && diff.localPath !== filePath) {
-				console.log(`Creating conflict files for case resolution: '${diff.localPath}' vs '${filePath}'`);
 				
 				// Create the remote version with conflict suffix
 				const remoteConflictPath = this.generateConflictPath(filePath, 'remote');
@@ -791,8 +823,11 @@ class SyncView extends ItemView {
 				
 				// Create backup of local version
 				const localBackupPath = this.generateConflictPath(diff.localPath, 'local');
-				const localContent = await vault.read(vault.getAbstractFileByPath(diff.localPath));
-				await vault.create(localBackupPath, localContent);
+				const localFile = vault.getAbstractFileByPath(diff.localPath);
+				if (localFile instanceof TFile) {
+					const localContent = await vault.read(localFile);
+					await vault.create(localBackupPath, localContent);
+				}
 				
 				// Show notice to user
 				new Notice(`Case conflict detected!\nRemote: ${remoteConflictPath}\nLocal backup: ${localBackupPath}\nPlease resolve manually.`, 10000);
@@ -800,7 +835,7 @@ class SyncView extends ItemView {
 		}
 	}
 
-	findCaseInsensitiveFile(vault: any, targetPath: string) {
+	findCaseInsensitiveFile(vault: Vault, targetPath: string) {
 		// Find files that match case-insensitively
 		const allFiles = vault.getAllLoadedFiles();
 		const targetLower = targetPath.toLowerCase();
@@ -829,7 +864,8 @@ class SyncView extends ItemView {
 
 	async getCurrentBranchSha(token: string, repoPath: string): Promise<string | null> {
 		try {
-			const response = await fetch(`https://api.github.com/repos/${repoPath}/git/ref/heads/main`, {
+			const response = await requestUrl({
+				url: `https://api.github.com/repos/${repoPath}/git/ref/heads/main`,
 				headers: {
 					'Authorization': `token ${token}`,
 					'User-Agent': 'Obsidian-Sync-Plugin',
@@ -837,12 +873,13 @@ class SyncView extends ItemView {
 				}
 			});
 
-			if (response.ok) {
-				const data = await response.json();
+			if (response.status === 200) {
+				const data = response.json;
 				return data.object.sha;
 			} else if (response.status === 404) {
 				// Try 'master' branch if 'main' doesn't exist
-				const masterResponse = await fetch(`https://api.github.com/repos/${repoPath}/git/ref/heads/master`, {
+				const masterResponse = await requestUrl({
+					url: `https://api.github.com/repos/${repoPath}/git/ref/heads/master`,
 					headers: {
 						'Authorization': `token ${token}`,
 						'User-Agent': 'Obsidian-Sync-Plugin',
@@ -850,15 +887,14 @@ class SyncView extends ItemView {
 					}
 				});
 
-				if (masterResponse.ok) {
-					const masterData = await masterResponse.json();
+				if (masterResponse.status === 200) {
+					const masterData = masterResponse.json;
 					return masterData.object.sha;
 				}
 			}
 			
 			return null;
 		} catch (error) {
-			console.error('Error getting current branch SHA:', error);
 			return null;
 		}
 	}
@@ -869,7 +905,8 @@ class SyncView extends ItemView {
 		const bytes = encoder.encode(content);
 		const base64Content = btoa(String.fromCharCode(...bytes));
 
-		const response = await fetch(`https://api.github.com/repos/${repoPath}/git/blobs`, {
+		const response = await requestUrl({
+			url: `https://api.github.com/repos/${repoPath}/git/blobs`,
 			method: 'POST',
 			headers: {
 				'Authorization': `token ${token}`,
@@ -883,17 +920,18 @@ class SyncView extends ItemView {
 			})
 		});
 
-		if (!response.ok) {
-			throw new Error(`Failed to create blob: ${response.status} ${response.statusText}`);
+		if (response.status !== 201 && response.status !== 200) {
+			throw new Error(`Failed to create blob: ${response.status}`);
 		}
 
-		const data = await response.json();
+		const data = response.json;
 		return data.sha;
 	}
 
 	async createTree(token: string, repoPath: string, baseSha: string, fileBlobs: {path: string, sha: string, mode: string}[], deletions: string[]): Promise<string> {
 		// Get the current tree
-		const currentTreeResponse = await fetch(`https://api.github.com/repos/${repoPath}/git/commits/${baseSha}`, {
+		const currentTreeResponse = await requestUrl({
+			url: `https://api.github.com/repos/${repoPath}/git/commits/${baseSha}`,
 			headers: {
 				'Authorization': `token ${token}`,
 				'User-Agent': 'Obsidian-Sync-Plugin',
@@ -901,15 +939,23 @@ class SyncView extends ItemView {
 			}
 		});
 
-		if (!currentTreeResponse.ok) {
-			throw new Error(`Failed to get current tree: ${currentTreeResponse.status} ${currentTreeResponse.statusText}`);
+		if (currentTreeResponse.status !== 200) {
+			throw new Error(`Failed to get current tree: ${currentTreeResponse.status}`);
 		}
 
-		const currentCommit = await currentTreeResponse.json();
+		const currentCommit = currentTreeResponse.json;
 		const baseTreeSha = currentCommit.tree.sha;
 
+		// Define proper type for GitHub tree items
+		interface GitHubTreeItem {
+			path: string;
+			mode: string;
+			type: string;
+			sha: string | null; // null for deletions
+		}
+
 		// Prepare tree items
-		const treeItems = fileBlobs.map(blob => ({
+		const treeItems: GitHubTreeItem[] = fileBlobs.map(blob => ({
 			path: blob.path,
 			mode: blob.mode,
 			type: 'blob',
@@ -922,12 +968,13 @@ class SyncView extends ItemView {
 				path: filename,
 				mode: '100644',
 				type: 'blob',
-				sha: null as any // null SHA means delete the file
+				sha: null // null SHA means delete the file
 			});
 		});
 
 		// Create new tree
-		const response = await fetch(`https://api.github.com/repos/${repoPath}/git/trees`, {
+		const response = await requestUrl({
+			url: `https://api.github.com/repos/${repoPath}/git/trees`,
 			method: 'POST',
 			headers: {
 				'Authorization': `token ${token}`,
@@ -941,18 +988,19 @@ class SyncView extends ItemView {
 			})
 		});
 
-		if (!response.ok) {
-			throw new Error(`Failed to create tree: ${response.status} ${response.statusText}`);
+		if (response.status !== 201 && response.status !== 200) {
+			throw new Error(`Failed to create tree: ${response.status}`);
 		}
 
-		const data = await response.json();
+		const data = response.json;
 		return data.sha;
 	}
 
 	async createCommit(token: string, repoPath: string, treeSha: string, parentSha: string, processedFiles: string[]): Promise<string> {
 		const commitMessage = this.generateCommitMessage(processedFiles);
 
-		const response = await fetch(`https://api.github.com/repos/${repoPath}/git/commits`, {
+		const response = await requestUrl({
+			url: `https://api.github.com/repos/${repoPath}/git/commits`,
 			method: 'POST',
 			headers: {
 				'Authorization': `token ${token}`,
@@ -967,11 +1015,11 @@ class SyncView extends ItemView {
 			})
 		});
 
-		if (!response.ok) {
-			throw new Error(`Failed to create commit: ${response.status} ${response.statusText}`);
+		if (response.status !== 201 && response.status !== 200) {
+			throw new Error(`Failed to create commit: ${response.status}`);
 		}
 
-		const data = await response.json();
+		const data = response.json;
 		return data.sha;
 	}
 
@@ -981,7 +1029,8 @@ class SyncView extends ItemView {
 		
 		for (const branch of branches) {
 			try {
-				const response = await fetch(`https://api.github.com/repos/${repoPath}/git/refs/heads/${branch}`, {
+				const response = await requestUrl({
+					url: `https://api.github.com/repos/${repoPath}/git/refs/heads/${branch}`,
 					method: 'PATCH',
 					headers: {
 						'Authorization': `token ${token}`,
@@ -994,17 +1043,15 @@ class SyncView extends ItemView {
 					})
 				});
 
-				if (response.ok) {
-					console.log(`Updated ${branch} branch to ${commitSha}`);
+				if (response.status === 200) {
 					return; // Success
 				} else if (response.status === 404) {
 					// Branch doesn't exist, try next one
 					continue;
 				} else {
-					throw new Error(`Failed to update ${branch} branch: ${response.status} ${response.statusText}`);
+					throw new Error(`Failed to update ${branch} branch: ${response.status}`);
 				}
 			} catch (error) {
-				console.error(`Error updating ${branch} branch:`, error);
 				if (branch === branches[branches.length - 1]) {
 					// Last branch attempt failed
 					throw error;
@@ -1028,11 +1075,10 @@ class SyncView extends ItemView {
 
 	async commitLocalChanges(processedFiles: string[]) {
 		try {
-			const adapter = this.plugin.app.vault.adapter as any;
+			const adapter = this.plugin.app.vault.adapter as VaultAdapter;
 			const vaultPath = adapter.basePath || adapter.path || adapter.fs?.getBasePath?.() || '';
 			
 			if (!vaultPath) {
-				console.warn('Could not determine vault path for Git operations');
 				return;
 			}
 
@@ -1062,7 +1108,6 @@ class SyncView extends ItemView {
 			});
 
 		} catch (error) {
-			console.warn('Could not commit local changes with Git:', error.message);
 			// This is not critical - the remote changes are already pushed
 		}
 	}
@@ -1070,11 +1115,10 @@ class SyncView extends ItemView {
 	async getGitChangedFiles(): Promise<{file: string, status: string}[]> {
 		try {
 			// Try to get vault path - different approaches for desktop vs mobile
-			const adapter = this.plugin.app.vault.adapter as any;
+			const adapter = this.plugin.app.vault.adapter as VaultAdapter;
 			const vaultPath = adapter.basePath || adapter.path || adapter.fs?.getBasePath?.() || '';
 			
 			if (!vaultPath) {
-				console.warn('Could not determine vault path, falling back to full scan');
 				throw new Error('Vault path not available');
 			}
 
@@ -1126,7 +1170,6 @@ class SyncView extends ItemView {
 			return changes;
 		} catch (error) {
 			// If isomorphic-git is not available or not a Git repository, fall back to checking all files
-			console.warn('Git not available or not a Git repository, falling back to full scan:', error.message);
 			
 			// Fallback: return all markdown files as "modified"
 			const vault = this.plugin.app.vault;
@@ -1140,7 +1183,7 @@ class SyncView extends ItemView {
 	}
 
 	createFileSystemInterface() {
-		const adapter = this.plugin.app.vault.adapter as any;
+		const adapter = this.plugin.app.vault.adapter as VaultAdapter;
 		
 		return {
 			promises: {
@@ -1200,13 +1243,16 @@ class SyncView extends ItemView {
 							throw new Error(`ENOENT: no such file or directory, stat '${filepath}'`);
 						}
 						
+						const isFile = file instanceof TFile;
+						const isDirectory = file instanceof TFolder;
+						
 						return {
-							isFile: () => file instanceof TFile,
-							isDirectory: () => file instanceof TFolder,
-							size: file instanceof TFile ? (file as TFile).stat?.size || 0 : 0,
+							isFile: () => isFile,
+							isDirectory: () => isDirectory,
+							size: isFile ? file.stat?.size || 0 : 0,
 							mode: 0o666,
-							mtime: new Date((file as any).stat?.mtime || Date.now()),
-							mtimeMs: (file as any).stat?.mtime || Date.now()
+							mtime: new Date(isFile ? file.stat?.mtime || Date.now() : Date.now()),
+							mtimeMs: isFile ? file.stat?.mtime || Date.now() : Date.now()
 						};
 					} catch (error) {
 						throw new Error(`ENOENT: no such file or directory, stat '${filepath}'`);
@@ -1228,12 +1274,12 @@ class SyncView extends ItemView {
 		};
 	}
 
-	async fetchDiffs(): Promise<any[]> {
+	async fetchDiffs(): Promise<FileDiff[]> {
 		if (!this.plugin.settings.selectedRepository) {
 			throw new Error('No repository selected');
 		}
 
-		const diffs: any[] = [];
+		const diffs: FileDiff[] = [];
 		const vault = this.plugin.app.vault;
 		const token = this.plugin.settings.githubToken;
 		const repoPath = this.plugin.settings.selectedRepository;
@@ -1243,15 +1289,12 @@ class SyncView extends ItemView {
 			const gitChanges = await this.getGitChangedFiles();
 			
 			if (gitChanges.length === 0) {
-				console.log('No Git changes detected');
 				return diffs;
 			}
 
-			console.log(`Git detected ${gitChanges.length} changed files, fetching remote tree...`);
 			
 			// Get the entire remote repository tree in ONE API call (much more efficient)
 			const remoteTree = await this.fetchRemoteTree(token, repoPath);
-			console.log(`Remote tree fetched with ${remoteTree.size} files and content. Comparing...`);
 			
 			// Check for remote changes you don't have locally
 			await this.checkForRemoteChanges(vault, remoteTree, gitChanges, diffs);
@@ -1291,11 +1334,14 @@ class SyncView extends ItemView {
 					// For modified/added files, read local content
 					const localFile = vault.getAbstractFileByPath(filePath);
 					if (!localFile || localFile.path !== filePath) {
-						console.warn(`Local file not found: ${filePath}`);
 						continue;
 					}
 
-					const localContent = await vault.read(localFile as any);
+					if (!(localFile instanceof TFile)) {
+						continue;
+					}
+
+					const localContent = await vault.read(localFile);
 					
 					// Check if file exists in remote tree
 					const remoteFile = remoteTree.get(filePath);
@@ -1366,7 +1412,6 @@ class SyncView extends ItemView {
 						// If SHA is the same, content is identical - no diff needed
 					}
 				} catch (fileError) {
-					console.warn(`Error processing file ${gitChange.file}:`, fileError);
 					continue;
 				}
 			}
@@ -1378,7 +1423,7 @@ class SyncView extends ItemView {
 		}
 	}
 
-	async checkForRemoteChanges(vault: any, remoteTree: Map<string, {sha: string, type: string, content?: string}>, gitChanges: {file: string, status: string}[], diffs: any[]) {
+	async checkForRemoteChanges(vault: Vault, remoteTree: Map<string, {sha: string, type: string, content?: string}>, gitChanges: {file: string, status: string}[], diffs: FileDiff[]) {
 		// Get list of files that Git has NOT flagged as changed
 		const gitChangedFiles = new Set(gitChanges.map(change => change.file));
 		
@@ -1387,7 +1432,7 @@ class SyncView extends ItemView {
 		const localFilesCaseInsensitive = new Map<string, any>();
 		const allLocalFiles = vault.getAllLoadedFiles();
 		
-		allLocalFiles.forEach((file: any) => {
+		allLocalFiles.forEach((file: TFile | TFolder) => {
 			localFilesExact.set(file.path, file);
 			localFilesCaseInsensitive.set(file.path.toLowerCase(), file);
 		});
@@ -1415,7 +1460,6 @@ class SyncView extends ItemView {
 					// Found case-insensitive match but not exact match
 					localFile = caseInsensitiveMatch;
 					matchType = 'case-conflict';
-					console.log(`Case mismatch: remote '${remotePath}' matches local '${localFile.path}' (case-insensitive)`);
 				}
 			}
 			
@@ -1518,7 +1562,6 @@ class SyncView extends ItemView {
 						});
 					}
 				} catch (error) {
-					console.warn(`Error checking remote changes for ${remotePath}:`, error);
 				}
 			}
 		}
@@ -1527,7 +1570,8 @@ class SyncView extends ItemView {
 	async fetchFileContentByBlob(token: string, repoPath: string, sha: string): Promise<string> {
 		try {
 			// Use GitHub Blob API to fetch content by SHA
-			const response = await fetch(`https://api.github.com/repos/${repoPath}/git/blobs/${sha}`, {
+			const response = await requestUrl({
+				url: `https://api.github.com/repos/${repoPath}/git/blobs/${sha}`,
 				headers: {
 					'Authorization': `token ${token}`,
 					'User-Agent': 'Obsidian-Sync-Plugin',
@@ -1535,8 +1579,8 @@ class SyncView extends ItemView {
 				}
 			});
 
-			if (response.ok) {
-				const blobData = await response.json();
+			if (response.status === 200) {
+				const blobData = response.json;
 				if (blobData.encoding === 'base64') {
 					// Properly decode base64 content with UTF-8 encoding
 					const base64Content = blobData.content.replace(/\n/g, '');
@@ -1555,11 +1599,9 @@ class SyncView extends ItemView {
 					return blobData.content || '';
 				}
 			} else {
-				console.warn(`Failed to fetch blob ${sha}: ${response.status} ${response.statusText}`);
 				return '';
 			}
 		} catch (error) {
-			console.warn(`Error fetching blob ${sha}:`, error);
 			return '';
 		}
 	}
@@ -1569,7 +1611,8 @@ class SyncView extends ItemView {
 		
 		try {
 			// Use GitHub Trees API to get entire repository structure in one call
-			const response = await fetch(`https://api.github.com/repos/${repoPath}/git/trees/HEAD?recursive=1`, {
+			const response = await requestUrl({
+				url: `https://api.github.com/repos/${repoPath}/git/trees/HEAD?recursive=1`,
 				headers: {
 					'Authorization': `token ${token}`,
 					'User-Agent': 'Obsidian-Sync-Plugin',
@@ -1577,14 +1620,14 @@ class SyncView extends ItemView {
 				}
 			});
 
-			if (response.ok) {
-				const data = await response.json();
+			if (response.status === 200) {
+				const data = response.json;
 				
 				// Build a map of file paths to their SHAs
 				if (data.tree) {
 					// First pass: collect all markdown files
 					const markdownFiles: {path: string, sha: string}[] = [];
-					data.tree.forEach((item: any) => {
+					data.tree.forEach((item: GitHubTreeItem) => {
 						if (item.type === 'blob' && item.path.endsWith('.md')) {
 							tree.set(item.path, {
 								sha: item.sha,
@@ -1595,12 +1638,10 @@ class SyncView extends ItemView {
 					});
 
 					// Second pass: batch fetch content for all markdown files in parallel
-					console.log(`Fetching content for ${markdownFiles.length} files...`);
 					const contentPromises = markdownFiles.map(file => 
 						this.fetchFileContentByBlob(token, repoPath, file.sha)
 							.then((content: string) => ({path: file.path, content}))
-							.catch((error: any) => {
-								console.warn(`Failed to fetch content for ${file.path}:`, error.message);
+							.catch((error: Error) => {
 								return {path: file.path, content: ''};
 							})
 					);
@@ -1618,13 +1659,11 @@ class SyncView extends ItemView {
 			} else if (response.status === 401) {
 				throw new Error('Invalid token - authentication failed');
 			} else if (response.status === 404) {
-				console.warn('Repository or branch not found, assuming empty remote');
 				// Return empty tree - all local files will be considered new
 			} else {
-				throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+				throw new Error(`GitHub API error: ${response.status}`);
 			}
 		} catch (error) {
-			console.warn('Failed to fetch remote tree:', error.message);
 			// Return empty tree as fallback
 		}
 		
@@ -1647,7 +1686,7 @@ class SyncView extends ItemView {
 		return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 	}
 
-	displayDiffs(diffs: any[]) {
+	displayDiffs(diffs: FileDiff[]) {
 		if (!this.diffContainer) return;
 
 		this.diffContainer.empty();
@@ -1723,7 +1762,7 @@ class SyncView extends ItemView {
 		});
 	}
 
-	generateDiffView(container: HTMLElement, diff: any) {
+	generateDiffView(container: HTMLElement, diff: FileDiff) {
 		const diffView = container.createEl('div', { cls: 'sync-diff-view' });
 
 		if (diff.status === 'added') {
