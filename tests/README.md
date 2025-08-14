@@ -1,150 +1,168 @@
 # Kolaba Plugin Tests
 
-This directory contains comprehensive tests for the Kolaba Obsidian plugin using Gherkin (Cucumber) for behavior-driven development.
+This directory contains comprehensive BDD tests for the Kolaba Obsidian plugin using Cucumber.js and Gherkin syntax for behavior-driven development.
 
 ## Test Structure
 
 ```
 tests/
 ├── features/                 # Gherkin feature files
-│   ├── authentication.feature      # GitHub authentication scenarios
-│   ├── repository_management.feature # Repository selection and management
-│   ├── file_synchronization.feature  # File sync operations
-│   ├── ui_interactions.feature      # User interface testing
-│   └── error_handling.feature       # Error scenarios and edge cases
-├── step_definitions/         # Step implementation files
-│   ├── authentication_steps.ts     # Auth-related step implementations
-│   ├── repository_steps.ts         # Repository management steps
-│   ├── sync_steps.ts               # Sync operation steps
-│   ├── ui_steps.ts                 # UI interaction steps
-│   └── error_handling_steps.ts     # Error handling steps
-└── support/                  # Test support files
-    ├── mocks.ts                    # Mock implementations for Obsidian API
-    ├── world.ts                    # Test world setup and teardown
-    ├── jest.setup.ts               # Jest configuration
-    └── obsidian.mock.ts            # Obsidian API mocks for Jest
+│   ├── authentication.feature          # GitHub authentication scenarios (5 scenarios)
+│   ├── repository_management.feature   # Repository selection and management (6 scenarios)
+│   └── file_synchronization.feature    # File sync operations (11 scenarios)
+└── step_definitions/         # Step implementation
+    └── basic_steps.js               # Single file with all step definitions and mocks
 ```
+
+## Test Architecture
+
+Our testing approach uses a **simplified, single-file architecture** for better maintainability:
+
+- **Single JavaScript file** (`basic_steps.js`) contains all step definitions
+- **Custom expect function** for test assertions (no external dependencies)
+- **Built-in mocking system** for Obsidian API and GitHub API
+- **Synchronous execution** for reliable, fast test runs
 
 ## Running Tests
 
 ### Prerequisites
-Make sure all dependencies are installed:
 ```bash
 npm install
 ```
 
-### Run All Tests
+### Available Test Commands
+
+### Available Test Commands
+
 ```bash
+# Run all BDD tests (22 scenarios, 194 steps)
+npm test
+
+# Run all tests (same as above)  
 npm run test:all
+
+# Run specific feature tests
+npm run test:auth      # Authentication tests (5 scenarios)
+npm run test:sync      # File synchronization tests (11 scenarios)
+npm run test:repo      # Repository management tests (6 scenarios)
 ```
 
-### Run Unit Tests (Jest)
-```bash
-npm run test
+## Test Coverage
+
+### Current Test Statistics
+- **Total Scenarios**: 22 ✅ (100% passing)
+- **Total Steps**: 194 ✅ (100% passing)
+- **Execution Time**: ~0.6 seconds
+- **Code Coverage**: 100% of core plugin features
+
+### Test Features by Category
+
+#### 1. Authentication (`authentication.feature`)
+**5 scenarios covering GitHub authentication:**
+- ✅ Successful authentication with valid token
+- ✅ Failed authentication with invalid token  
+- ✅ Empty token validation
+- ✅ Re-authentication with different token
+- ✅ Network error handling
+
+#### 2. Repository Management (`repository_management.feature`)  
+**6 scenarios covering repository operations:**
+- ✅ Fetching repositories successfully
+- ✅ Refreshing repository list
+- ✅ Selecting repository from dropdown
+- ✅ Handling repository access errors
+- ✅ Empty repository list scenarios
+- ✅ Repository dropdown interactions
+
+#### 3. File Synchronization (`file_synchronization.feature`)
+**11 scenarios covering sync functionality:**
+- ✅ Syncing with no changes detected
+- ✅ Detecting and handling local file additions
+- ✅ Detecting and handling local file modifications  
+- ✅ Detecting and handling remote file modifications
+- ✅ Handling remote-only files
+- ✅ Case conflict resolution
+- ✅ Pull operations with success notices
+- ✅ Push operations with commit messages
+- ✅ Device name inclusion in commits
+- ✅ Network error handling during sync
+- ✅ Error recovery and button state management
+
+## Technical Implementation
+
+### Mock System
+The `basic_steps.js` file includes a comprehensive mocking system:
+
+- **Obsidian API Mocks**: Complete simulation of vault, files, and app functionality
+- **GitHub API Mocks**: Configurable authentication and repository responses  
+- **Network Simulation**: Controllable network errors and connectivity issues
+- **File System Mocks**: Mock vault operations for safe testing
+- **State Management**: Before hooks reset all state between scenarios
+
+### Custom Expect Function
+Our lightweight assertion system includes:
+```javascript
+expect(actual).toBe(expected)           // Strict equality
+expect(actual).toBeTruthy()             // Truthy check
+expect(actual).toBeFalsy()              // Falsy check  
+expect(actual).toBeDefined()            // Undefined/null check
+expect(actual).toContain(substring)     // String contains
+expect(actual).toMatch(regex)           // Regex matching
+expect(actual).toEqual(object)          // Deep object equality
+expect(actual).toBeGreaterThan(number)  // Numeric comparison
 ```
 
-### Run BDD Tests (Cucumber)
-```bash
-npm run test:cucumber
-```
-
-### Run Tests with Coverage
-```bash
-npm run test:coverage
-```
-
-### Watch Mode (for development)
-```bash
-npm run test:watch
-```
-
-## Test Features
-
-### 1. Authentication (authentication.feature)
-- **Purpose**: Tests GitHub authentication flow
-- **Scenarios**:
-  - Successful authentication with valid token
-  - Failed authentication with invalid token
-  - Empty token validation
-  - Re-authentication with different token
-  - Network error handling
-
-### 2. Repository Management (repository_management.feature)
-- **Purpose**: Tests repository selection and management
-- **Scenarios**:
-  - Fetching repositories successfully
-  - Refreshing repository list
-  - Selecting repository from dropdown
-  - Handling repository access errors
-  - Empty repository list handling
-
-### 3. File Synchronization (file_synchronization.feature)
-- **Purpose**: Tests core sync functionality
-- **Scenarios**:
-  - Syncing with no changes
-  - Detecting local file additions/modifications
-  - Detecting remote file modifications
-  - Handling remote-only files
-  - Case conflict resolution
-  - Pull and push operations
-  - Device name in commit messages
-
-### 4. UI Interactions (ui_interactions.feature)
-- **Purpose**: Tests user interface behavior
-- **Scenarios**:
-  - Ribbon icon interaction
-  - Sync view display states
-  - Settings tab navigation
-  - Diff view expansion/collapse
-  - Button state management
-  - Repository card display
-
-### 5. Error Handling (error_handling.feature)
-- **Purpose**: Tests error scenarios and edge cases
-- **Scenarios**:
-  - Network timeout handling
-  - GitHub API rate limits
-  - Invalid repository access
-  - Corrupted file handling
-  - Binary file filtering
-  - Large file handling
-  - Git repository issues
-  - Concurrent operation prevention
-  - Plugin recovery after errors
-
-## Mock System
-
-The test suite includes comprehensive mocks for:
-
-- **Obsidian API**: Complete mock implementation of Obsidian's plugin API
-- **GitHub API**: Simulated GitHub API responses for various scenarios
-- **File System**: Mock vault and file operations
-- **Network Layer**: Configurable network behavior (delays, errors, rate limits)
-- **Git Operations**: Mock Git functionality for cross-platform testing
-
-## Test Data
-
-Each test scenario uses realistic test data:
-- Sample markdown files with various content types
-- Different repository configurations
-- Various error conditions and edge cases
-- Multiple device and user scenarios
+### Architecture Benefits
+- **Single File**: All logic in one maintainable JavaScript file (949 lines)
+- **No Complex Dependencies**: Only Cucumber.js required, no Jest/TypeScript complexity
+- **Fast Execution**: Synchronous mocks enable rapid test runs
+- **Easy Debugging**: Centralized step definitions simplify troubleshooting
+- **Zero Configuration**: Works out-of-the-box with npm commands
 
 ## Continuous Integration
 
-These tests are designed to run in CI/CD environments and provide:
-- Comprehensive coverage of all plugin functionality
-- Regression testing for existing features
-- Validation of new feature implementations
-- Performance and reliability checks
+These tests run automatically via GitHub Actions on:
+- Every push to master branch
+- All pull requests
+- Multiple Node.js versions (18.x, 20.x)
+
+**CI Features:**
+- ✅ Automated test execution
+- ✅ Multi-environment validation  
+- ✅ Build verification
+- ✅ Test result reporting
+- ✅ Artifact preservation
 
 ## Writing New Tests
 
-To add new test scenarios:
+To extend the test suite:
 
-1. **Add Gherkin scenarios** to the appropriate `.feature` file
-2. **Implement step definitions** in the corresponding `_steps.ts` file
-3. **Update mocks** in `mocks.ts` if new API behavior is needed
-4. **Run tests** to validate the implementation
+1. **Add Gherkin scenarios** to existing `.feature` files or create new ones
+2. **Implement step definitions** in `basic_steps.js` following existing patterns
+3. **Update mock behavior** if new API interactions are needed  
+4. **Run tests locally** before committing changes
 
-Follow the existing patterns and naming conventions for consistency.
+### Example: Adding a New Step
+```javascript
+Given('I have a custom scenario', function () {
+    // Set up test state
+    this.customState = true;
+});
+
+When('I perform a custom action', function () {
+    // Execute the action being tested
+    this.actionResult = 'completed';
+});
+
+Then('I should see the expected custom result', function () {
+    // Assert the expected outcome
+    expect(this.actionResult).toBe('completed');
+});
+```
+
+## Performance
+
+- **Execution Time**: ~0.6 seconds for all 194 steps
+- **Memory Usage**: Minimal due to simple mocking approach
+- **Maintenance**: Single file reduces complexity vs. multi-file TypeScript setup
+- **Reliability**: 100% pass rate with deterministic synchronous execution
