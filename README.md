@@ -1,5 +1,9 @@
 # Kolaba
 
+![Tests](https://img.shields.io/github/actions/workflow/status/skvortsovden/kolaba/test.yml?branch=master&label=tests&logo=github)
+![Build](https://img.shields.io/github/actions/workflow/status/skvortsovden/kolaba/test.yml?branch=master&label=build&logo=github)
+![Node](https://img.shields.io/badge/node-%3E%3D18.x-brightgreen)
+
 Keep your notes synchronized across devices with GitHub repositories.
 
 Kolaba is an Obsidian plugin that enables seamless synchronization of your notes between multiple devices using GitHub as the backend. Whether you're switching between your laptop, desktop, or mobile device, your notes stay perfectly in sync.
@@ -73,6 +77,32 @@ Kolaba is an Obsidian plugin that enables seamless synchronization of your notes
 - Make sure your NodeJS is at least v16 (`node --version`)
 - `npm i` or `yarn` to install dependencies
 - `npm run dev` to start compilation in watch mode
+
+### Testing
+This project uses Behavior Driven Development (BDD) with Cucumber.js and Gherkin syntax.
+
+**Test Coverage:**
+- 🧪 **22 scenarios** covering all major features
+- ✅ **194 test steps** with 100% pass rate
+- 🎯 **3 feature areas**: Authentication, File Synchronization, Repository Management
+
+**Available Test Commands:**
+```bash
+npm test              # Run all BDD tests
+npm run test:auth     # Run authentication tests only
+npm run test:sync     # Run file synchronization tests only  
+npm run test:repo     # Run repository management tests only
+```
+
+**Test Features:**
+- **Authentication**: Token validation, re-authentication, network error handling
+- **File Synchronization**: Push/pull operations, conflict detection, case conflicts
+- **Repository Management**: Fetching, selecting, permissions, dropdown interactions
+
+**Continuous Integration:**
+- Tests run automatically on every push via GitHub Actions
+- Multi-node version testing (Node 18.x, 20.x)  
+- Build verification and artifact generation
 
 ### Manual Installation
 - Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/kolaba/`
