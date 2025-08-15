@@ -1,7 +1,5 @@
 # Kolaba
 
-![Tests](https://img.shields.io/github/actions/workflow/status/skvortsovden/kolaba/test.yml?branch=master&label=tests&logo=github)
-![Build](https://img.shields.io/github/actions/workflow/status/skvortsovden/kolaba/test.yml?branch=master&label=build&logo=github)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.x-brightgreen)
 
 Keep your notes synchronized across devices with GitHub repositories.
