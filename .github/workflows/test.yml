@@ -27,17 +27,8 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run BDD Tests
+    - name: Run TypeScript BDD Tests  
       run: npm test
-
-    - name: Run Authentication Tests
-      run: npm run test:auth
-
-    - name: Run File Synchronization Tests  
-      run: npm run test:sync
-
-    - name: Run Repository Management Tests
-      run: npm run test:repo
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
