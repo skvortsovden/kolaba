@@ -813,6 +813,9 @@ class SyncView extends ItemView {
 				// File doesn't exist locally, create it with remote content
 				await vault.create(filePath, diff.remoteContent);
 			}
+		} else if (diff.status === 'remote-only') {
+			// File exists only in remote repository - create it locally
+			await vault.create(filePath, diff.remoteContent);
 		} else if (diff.status === 'case-conflict-only') {
 			// Handle pure case conflicts - create both files for manual resolution
 			if (diff.localPath && diff.localPath !== filePath) {

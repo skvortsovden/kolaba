@@ -56,6 +56,16 @@ Feature: File Synchronization
     Then I should see the file marked as "case-conflict-only"
     And I should be prompted to resolve the case conflict manually
 
+  Scenario: Pulling remote-only files
+    Given files exist in the remote repository
+    And these files don't exist in my local vault
+    When I click the "Sync" button
+    And I click the "Pull" button
+    Then I should see "Pulling..." while processing
+    And the remote-only files should be created in my local vault
+    And I should see a success notice "Successfully pulled <count> files"
+    And the local files should be committed with Git
+
   Scenario: Successful pull operation
     Given I have detected remote changes
     And the pull button is enabled
