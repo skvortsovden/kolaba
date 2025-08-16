@@ -68,6 +68,73 @@ Kolaba is an Obsidian plugin that enables seamless synchronization of your notes
 - GitHub account with repository access
 - Personal Access Token with repository permissions
 
+## 🔄 Sync Workflow
+
+```mermaid
+flowchart TD
+    A["User clicks 'Sync' button"] --> B["fetchDiffs() called"]
+    B --> C["Get Git changed files locally"]
+    C --> D["Fetch remote repository tree from GitHub"]
+    D --> E["Compare local vs remote files"]
+    E --> F{"Files differ?"}
+    
+    F -->|No| G["No changes found<br/>Pull & Push disabled"]
+    F -->|Yes| H["Analyze differences"]
+    
+    H --> I["Check for remote changes"]
+    H --> J["Check for local changes"]
+    H --> K["Check for case conflicts"]
+    
+    I --> L{"Remote changes<br/>found?"}
+    J --> M{"Local changes<br/>found?"}
+    K --> N{"Case conflicts<br/>found?"}
+    
+    L -->|Yes| O["Enable Pull button"]
+    L -->|No| P["Keep Pull disabled"]
+    
+    M -->|Yes| Q["Enable Push button"]
+    M -->|No| R["Keep Push disabled"]
+    
+    N -->|Yes| S["Mark for conflict resolution"]
+    
+    O --> T["Display diff results"]
+    P --> T
+    Q --> T
+    R --> T
+    S --> T
+    
+    T --> U{"User chooses action"}
+    
+    U -->|Pull| V["handlePullClick()"]
+    U -->|Push| W["handlePushClick()"]
+    U -->|Review| X["View diff details"]
+    
+    V --> V1["Filter remote changes"]
+    V1 --> V2["Download remote content"]
+    V2 --> V3["Overwrite local files"]
+    V3 --> V4["Handle case conflicts"]
+    V4 --> V5["Commit changes locally"]
+    V5 --> V6["Refresh diff view"]
+    V6 --> Y["Success: Files pulled"]
+    
+    W --> W1["Filter local changes"]
+    W1 --> W2["Create GitHub blobs"]
+    W2 --> W3["Create new tree"]
+    W3 --> W4["Create commit"]
+    W4 --> W5["Update branch reference"]
+    W5 --> W6["Commit changes locally"]
+    W6 --> W7["Refresh diff view"]
+    W7 --> Z["Success: Files pushed"]
+    
+    X --> T
+    
+    style A fill:#e1f5fe
+    style U fill:#fff3e0
+    style Y fill:#e8f5e8
+    style Z fill:#e8f5e8
+    style G fill:#ffebee
+```
+
 ## 🔧 For Developers
 
 ### Development Setup
