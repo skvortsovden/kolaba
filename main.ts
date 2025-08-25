@@ -753,7 +753,7 @@ class SyncView extends ItemView {
 		if (diff.status === 'remote-added') {
 			// Check for case-insensitive conflicts
 			const conflictingFile = this.findCaseInsensitiveFile(vault, filePath);
-			
+
 			if (conflictingFile) {
 				
 				// Handle case conflict - create both files for manual resolution
@@ -815,7 +815,16 @@ class SyncView extends ItemView {
 			}
 		} else if (diff.status === 'remote-only') {
 			// File exists only in remote repository - create it locally
-			await vault.create(filePath, diff.remoteContent);
+			// Remove all Windows-invalid filename characters except '/' (used for path)
+			let sanitizedFilePath = filePath.replace(/[\\:*?"<>|]/g, "");
+			const path = sanitizedFilePath.split("/");
+			if (path.length > 1) {
+				const folderPath = path.slice(0, -1).join("/");
+				if (!vault.getAbstractFileByPath(folderPath)) {
+					await vault.createFolder(folderPath);
+				}
+			}
+			await vault.create(sanitizedFilePath, diff.remoteContent);
 		} else if (diff.status === 'case-conflict-only') {
 			// Handle pure case conflicts - create both files for manual resolution
 			if (diff.localPath && diff.localPath !== filePath) {
