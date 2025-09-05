@@ -397,6 +397,9 @@ class KolabaSettingTab extends PluginSettingTab {
 }
 
 class SyncView extends ItemView {
+	private currentDiffsForDisplay: FileDiff[] = [];
+	// Track checkbox state: filename -> checked
+	private fileCheckboxState: Record<string, boolean> = {};
 	plugin: KolabaPlugin;
 	private syncButton: HTMLButtonElement | null = null;
 	private pullButton: HTMLButtonElement | null = null;
@@ -473,6 +476,7 @@ class SyncView extends ItemView {
 				this.handlePushClick();
 			});
 
+
 			// Container for diff results
 			this.diffContainer = container.createEl('div', { cls: 'sync-diff-container' });
 
@@ -497,7 +501,11 @@ class SyncView extends ItemView {
 		try {
 			// Fetch diffs
 			this.currentDiffs = await this.fetchDiffs();
-			
+			// Initialize all checkboxes to true
+			this.fileCheckboxState = {};
+			this.currentDiffs.forEach(diff => {
+				this.fileCheckboxState[diff.filename] = true;
+			});
 			// Display diff results
 			this.displayDiffs(this.currentDiffs);
 			
@@ -548,17 +556,28 @@ class SyncView extends ItemView {
 		this.pushButton!.disabled = true;
 
 		try {
+			// Only process checked files
+			const checkedFiles = this.currentDiffs.filter(diff => this.fileCheckboxState[diff.filename]);
+			if (checkedFiles.length === 0) {
+				new Notice('No files selected for Pull.');
+				this.pullButton.textContent = 'Pull';
+				this.pullButton.disabled = false;
+				this.syncButton!.disabled = false;
+				this.pushButton!.disabled = false;
+				return;
+			}
 
-			// Filter for remote changes, local modifications, and remote-only files
+			// Filter for remote changes, local modifications, and remote-only files, and checked
 			const remoteDiffs = this.currentDiffs.filter(diff => 
-			   diff.status === 'remote-modified' || 
+			   (diff.status === 'remote-modified' || 
 			   diff.status === 'case-conflict-only' ||
 			   diff.status === 'modified' ||
-			   diff.status === 'remote-only'
+			   diff.status === 'remote-only') &&
+			   this.fileCheckboxState[diff.filename]
 			);
 
 			if (remoteDiffs.length === 0) {
-				new Notice('No remote changes, local modifications, or remote-only files to pull');
+				new Notice('No selected files to pull');
 				this.pullButton.textContent = 'Pull';
 				this.pullButton.disabled = false;
 				this.syncButton!.disabled = false;
@@ -567,7 +586,7 @@ class SyncView extends ItemView {
 
 			// Process remote changes and remote-only files
 			await this.performPull(remoteDiffs);
-			
+
 			// Success
 			new Notice(`Successfully pulled ${remoteDiffs.length} file${remoteDiffs.length === 1 ? '' : 's'}`);
 			
@@ -615,15 +634,24 @@ class SyncView extends ItemView {
 		this.pullButton!.disabled = true;
 
 		try {
-		   // Filter for pushable changes: local changes and remote-only files to delete
+			// Only process checked files
+			const checkedFiles = this.currentDiffs.filter(diff => this.fileCheckboxState[diff.filename]);
+			if (checkedFiles.length === 0) {
+				new Notice('No files selected for Push.');
+				this.pushButton.textContent = 'Push';
+				this.pushButton.disabled = false;
+				this.syncButton!.disabled = false;
+				this.pullButton!.disabled = false;
+				return;
+			}
+		   // Filter for pushable changes: local changes and remote-only files to delete, and checked
 		   const pushableDiffs = this.currentDiffs.filter(diff => 
-			   diff.status === 'added' || 
-			   diff.status === 'modified' || 
-			   diff.status === 'remote-only'
+			   (diff.status === 'added' || diff.status === 'modified' || diff.status === 'remote-only') &&
+			   this.fileCheckboxState[diff.filename]
 		   );
 
 			if (pushableDiffs.length === 0) {
-				new Notice('No changes to push');
+				new Notice('No selected files to push');
 				this.pushButton.textContent = 'Push';
 				this.pushButton.disabled = false;
 				this.syncButton!.disabled = false;
@@ -1226,10 +1254,42 @@ class SyncView extends ItemView {
 									// Add the top-level directory
 									items.add(parts[0]);
 								}
+
+								// Add select/deselect all buttons above diff list only if there are files
+							this.currentDiffsForDisplay = diffs;
+							if (!this.diffContainer) return;
+
+							if (diffs.length === 0) {
+								this.diffContainer.createEl('div', {
+									text: 'No changes',
+									cls: 'sync-no-changes'
+								});
+								return;
+							}
+
+							// Only show select/deselect all buttons if there are files
+							const selectButtonsContainer = this.diffContainer.createEl('div', { cls: 'sync-select-buttons-container' });
+							const selectAllBtn = selectButtonsContainer.createEl('button', { text: 'Select All', cls: 'sync-select-all-btn' });
+							const deselectAllBtn = selectButtonsContainer.createEl('button', { text: 'Deselect All', cls: 'sync-deselect-all-btn' });
+
+							selectAllBtn.addEventListener('click', () => {
+								Object.keys(this.fileCheckboxState).forEach(filename => {
+									this.fileCheckboxState[filename] = true;
+								});
+								this.displayDiffs(this.currentDiffsForDisplay);
+							});
+							deselectAllBtn.addEventListener('click', () => {
+								Object.keys(this.fileCheckboxState).forEach(filename => {
+									this.fileCheckboxState[filename] = false;
+								});
+								this.displayDiffs(this.currentDiffsForDisplay);
+							});
+
 							});
 							
 							return Array.from(items);
 						} else {
+
 							// For subdirectories, list contents
 							const allFiles = this.plugin.app.vault.getAllLoadedFiles();
 							const items = new Set<string>();
@@ -1698,81 +1758,90 @@ class SyncView extends ItemView {
 		return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 	}
 
-	displayDiffs(diffs: FileDiff[]) {
+		displayDiffs(diffs: FileDiff[]) {
+		this.currentDiffsForDisplay = diffs;
 		if (!this.diffContainer) return;
 
-		this.diffContainer.empty();
-		
-		if (diffs.length === 0) {
-			this.diffContainer.createEl('div', {
-				text: 'No changes',
-				cls: 'sync-no-changes'
-			});
-			return;
-		}
+			this.diffContainer.empty();
 
-		const diffsHeader = this.diffContainer.createEl('h3', { 
-			text: `${diffs.length} file${diffs.length === 1 ? '' : 's'} changed`,
-			cls: 'sync-diffs-header'
-		});
-
-		const diffContainer = this.diffContainer; // Store reference for type safety
-		diffs.forEach(diff => {
-			const diffItem = diffContainer.createEl('div', { cls: 'sync-diff-item' });
-			
-			// File header (clickable to expand/collapse)
-			const fileHeader = diffItem.createEl('div', { cls: 'sync-diff-file-header sync-diff-expandable' });
-			const expandIcon = fileHeader.createEl('span', { 
-				text: '▶',
-				cls: 'sync-diff-expand-icon'
-			});
-			fileHeader.createEl('span', { 
-				text: diff.filename,
-				cls: 'sync-diff-filename'
-			});
-			fileHeader.createEl('span', { 
-				text: diff.status,
-				cls: `sync-diff-status sync-diff-status-${diff.status}`
-			});
-			
-			// Stats
-			const stats = fileHeader.createEl('div', { cls: 'sync-diff-stats' });
-			if (diff.additions > 0) {
-				stats.createEl('span', { 
-					text: `+${diff.additions}`,
-					cls: 'sync-diff-additions'
+			if (diffs.length === 0) {
+				this.diffContainer.createEl('div', {
+					text: 'No changes',
+					cls: 'sync-no-changes'
 				});
-			}
-			if (diff.deletions > 0) {
-				stats.createEl('span', { 
-					text: `-${diff.deletions}`,
-					cls: 'sync-diff-deletions'
-				});
+				return;
 			}
 
-			// Diff content (initially hidden)
-			const diffContent = diffItem.createEl('div', { 
-				cls: 'sync-diff-content sync-diff-hidden'
+			const diffsHeader = this.diffContainer.createEl('h3', {
+				text: `${diffs.length} file${diffs.length === 1 ? '' : 's'} changed`,
+				cls: 'sync-diffs-header'
 			});
 
-			// Generate and display the actual diff
-			this.generateDiffView(diffContent, diff);
+			const diffContainer = this.diffContainer;
+			diffs.forEach(diff => {
+				const diffItem = diffContainer.createEl('div', { cls: 'sync-diff-item' });
 
-			// Toggle functionality
-			let isExpanded = false;
-			fileHeader.addEventListener('click', () => {
-				isExpanded = !isExpanded;
-				expandIcon.textContent = isExpanded ? '▼' : '▶';
-				if (isExpanded) {
-					diffContent.removeClass('sync-diff-hidden');
-					diffContent.addClass('sync-diff-visible');
-				} else {
-					diffContent.removeClass('sync-diff-visible');
-					diffContent.addClass('sync-diff-hidden');
+				// Checkbox
+				const checkbox = diffItem.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+				checkbox.checked = this.fileCheckboxState[diff.filename] ?? true;
+				checkbox.classList.add('sync-diff-checkbox');
+				checkbox.addEventListener('change', () => {
+					this.fileCheckboxState[diff.filename] = checkbox.checked;
+				});
+
+				// File header (clickable to expand/collapse)
+				const fileHeader = diffItem.createEl('div', { cls: 'sync-diff-file-header sync-diff-expandable' });
+				const expandIcon = fileHeader.createEl('span', {
+					text: '▶',
+					cls: 'sync-diff-expand-icon'
+				});
+				fileHeader.createEl('span', {
+					text: diff.filename,
+					cls: 'sync-diff-filename'
+				});
+				fileHeader.createEl('span', {
+					text: diff.status,
+					cls: `sync-diff-status sync-diff-status-${diff.status}`
+				});
+
+				// Stats
+				const stats = fileHeader.createEl('div', { cls: 'sync-diff-stats' });
+				if (diff.additions > 0) {
+					stats.createEl('span', {
+						text: `+${diff.additions}`,
+						cls: 'sync-diff-additions'
+					});
 				}
+				if (diff.deletions > 0) {
+					stats.createEl('span', {
+						text: `-${diff.deletions}`,
+						cls: 'sync-diff-deletions'
+					});
+				}
+
+				// Diff content (initially hidden)
+				const diffContent = diffItem.createEl('div', {
+					cls: 'sync-diff-content sync-diff-hidden'
+				});
+
+				// Generate and display the actual diff
+				this.generateDiffView(diffContent, diff);
+
+				// Toggle functionality
+				let isExpanded = false;
+				fileHeader.addEventListener('click', () => {
+					isExpanded = !isExpanded;
+					expandIcon.textContent = isExpanded ? '▼' : '▶';
+					if (isExpanded) {
+						diffContent.removeClass('sync-diff-hidden');
+						diffContent.addClass('sync-diff-visible');
+					} else {
+						diffContent.removeClass('sync-diff-visible');
+						diffContent.addClass('sync-diff-hidden');
+					}
+				});
 			});
-		});
-	}
+		}
 
 	generateDiffView(container: HTMLElement, diff: FileDiff) {
 		const diffView = container.createEl('div', { cls: 'sync-diff-view' });
